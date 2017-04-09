@@ -35,6 +35,28 @@ class AsyncEventBus implements EventBus
      */
     public function publish(DomainEventStream $domainMessages)
     {
+        $pid = pcntl_fork();
+
+        if ($pid === -1) {
+            // -1: error: dispatch synchronously
+            $this->dispatch($domainMessages);
+        } elseif ($pid === 0) {
+            // 0: success: dispatch asynchronously
+            $this->dispatch($domainMessages);
+            // stop process here
+            die;
+        } else {
+            // continue process without handling this message
+        }
+    }
+
+    /**
+     * Dispatches the events from the domain event stream to the listeners.
+     *
+     * @param DomainEventStream $domainMessages
+     */
+    public function dispatch(DomainEventStream $domainMessages)
+    {
         foreach ($domainMessages as $domainMessage) {
             $this->queue[] = $domainMessage;
         }
@@ -45,7 +67,7 @@ class AsyncEventBus implements EventBus
             try {
                 while ($domainMessage = array_shift($this->queue)) {
                     foreach ($this->eventListeners as $eventListener) {
-                        // TODO: Dispatches domain message asynchronously
+                        $eventListener->handle($domainMessage);
                     }
                 }
             } finally {
